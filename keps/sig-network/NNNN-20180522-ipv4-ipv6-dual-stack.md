@@ -102,6 +102,31 @@ CNI plugins may return multiple IPv6 address per pod, but should return a maximu
 The order of assigned IP addresses that are returned in the CNI plugin result for pod creation will be used to determine the "Primary Pod IP" as described in the previous section.
 
 ### Multiple Service VIPs per Service
+
+The Service will have one or more service VIPS.
+- The service allocator will need to have one or more subnet ranges specified for it to allocate VIPs
+- The service allocator will allocate and track service VIPs for each subnet
+
+- Need to update the api server CLI to specify the service cluster ip range
+  --service-cluster-ip-range ipNet     Default: 10.0.0.0/24
+
+- Need to update the controller-manager CLI to specify the service cluster ip range
+     --service-cluster-ip-range string
+
+
+kubectl get service command will return multiple IP's
+~/go/src/k8s.io/kubernetes# kubectl get service
+NAME         TYPE        CLUSTER-IP                EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   fd00:1234::1, 10.96.0.1   <none>        443/TCP   4d
+
+kubectl get endpoints will return multiple IP's
+~/go/src/k8s.io/kubernetes# kubectl get endpoints
+NAME         ENDPOINTS                          AGE
+kubernetes   [fd00:90::2]:6443, 10.0.0.2:6643   4d
+
+
+
+
 ### Kube-Proxy/IPVS Operation (Dane - kube-proxy)
 ### Support of Health Probes (Dane)
 ### Kube-DNS/Core-DNS Operation
@@ -139,6 +164,18 @@ In order to maintain backwards compatibility for the core V1 API, this proposal 
 ```
 
 #### Service Status
+Need to update the service v1 core api
+##### Versioned API Changes: core V1 API
+    // clusterIP is the IP address of the service and is usually assigned
+    // randomly by the master.
+    ClusterIP string `json:"clusterIP,omitempty" protobuf:"bytes,3,opt,name=clusterIP"`
+
+    // Additional cluster IP's
+    ExtraClusterIP []string `json:"extraclusterIP,omitempty" protobuf:"bytes,3,opt,name=ExtraclusterIP"`
+
+##### Internal Representation:
+
+    ClusterIPs []string `json:"clusterIPs,omitempty" protobuf:"bytes,3,opt,name=clusterIPs"`
 
 #### Node Resource
 
@@ -151,6 +188,11 @@ In order to maintain backwards compatibility for the core V1 API, this proposal 
 #### coreDns Configuration Changes
 
 ### kubeadm Support
+- Update for multiple service CIDRs
+
+### Kubeadm-dind-cluster Support
+Will be modified to add the extra service subnet support
+
 
 ### End-to-End Test Support
 
