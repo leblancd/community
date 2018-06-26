@@ -62,7 +62,9 @@ Table of Contents
          * [Load Balancer Operation ???](#load-balancer-operation-)
          * [Network Policy Considerations ???](#network-policy-considerations-)
          * [Cloud Provider Plugins Considerations ???](#cloud-provider-plugins-considerations-)
-         * [kubeadm Support](#kubeadm-support)
+         * [Container Environment Variables](#container-environment-variables)
+         * [Kubeadm Support](#kubeadm-support)
+         * [Spf13/pflag](#vendorgithubcomspf13pflag)
          * [End-to-End Test Support](#end-to-end-test-support)
          * [User Stories [optional]](#user-stories-optional)
             * [Story 1](#story-1)
@@ -237,7 +239,7 @@ The internal representation for the service IP (a.k.a. cluster IP) will be chang
 A new, plural "service-cluster-ip-ranges" option for the [kube-apiserver startup configuration](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/) is proposed, in addition to retaining the existing, singular "service-cluster-ip-range" option (for backwards compaibility):
 ```
   --service-cluster-ip-range  ipNet         [Singular IP CIDR,  Default: 10.0.0.0/24]
-  --service-cluster-ip-ranges stringSlice   [Multiple IP CIDRs, comma separated list of CIDRs, Default: []]
+  --service-cluster-ip-ranges ipNetSlice    [Multiple IP CIDRs, comma separated list of CIDRs, Default: []]
 ```
 The singular --service-cluster-ip-range argument will become deprecated.
 
@@ -245,7 +247,7 @@ The singular --service-cluster-ip-range argument will become deprecated.
 A new, plural "service-cluster-ip-ranges" option for the [controller-manager startup configuration](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) is proposed, in addition to retaining the existing, singular "service-cluster-ip-range" option (for backwards compaibility):
 ```
   --service-cluster-ip-range  ipNet         [Singular IP CIDR,  Default: 10.0.0.0/24]
-  --service-cluster-ip-ranges stringSlice   [Multiple IP CIDRs, comma separated list of CIDRs, Default: []]
+  --service-cluster-ip-ranges ipNetSlice    [Multiple IP CIDRs, comma separated list of CIDRs, Default: []]
 ```
 The singular --service-cluster-ip-range argument will become deprecated.
 
@@ -338,8 +340,74 @@ The [NGINX ingress controller](https://github.com/kubernetes/ingress-nginx/blob/
 
 ### Cloud Provider Plugins Considerations ???
 
-### kubeadm Support
-\<TBD\>
+### Container Environment Variables
+The [container environmental variables](https://kubernetes.io/docs/concepts/containers/container-environment-variables/#container-environment) should support dual stack.
+
+
+ The Downward API [status.podIP](https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/#capabilities-of-the-downward-api)
+ will contain a single IP address, and should be the same family as the default family.
+ A new variable named status.podIPs will contain a comma separated list of IP addresses.
+ The new pod API will have a slice of structures for the additional IP addresses,
+ Kubelet will translate the pod structs and return podIPs as a comma delimited string.
+
+In the pod definition yaml file
+
+```
+   - name: MY_POD_IPS
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIPs
+```
+Creates the environmental variable in the pod
+
+```
+ MY_POD_IPS=fd00:10:20:0:3::3,10.20.3.3
+```
+
+
+### Kubeadm Support
+Kubeadm should support dual stack.
+
+- The Kubeadm config options and config file will support dual stack options
+for apiserver-advertise-address, and podSubnet.
+
+The following kubeadm config options will be updated for dual stack.
+
+```
+api:
+  advertiseAddress: "fd00:90::2,10.90.0.2" [Multiple IP CIDRs, comma separated list of CIDRs]
+networking:
+  podSubnet: "fd00:10:20::/72,10.20.0.0/16" [Multiple IP CIDRs, comma separated list of CIDRs]
+  serviceSubnet: "fd00:1234::/110,10.1.0.0/16" [Multiple IP CIDRs, comma separated list of CIDRs]
+```
+
+
+The following manifests will be updated by Kubeadm
+kube-apiserver.yaml
+
+```
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --service-cluster-ip-range=fd00:1234::/110,10.96.0.0/12
+
+```
+
+kube-controller-manager.yaml
+
+```
+spec:
+  containers:
+  - command:
+    - kube-controller-manager
+    - --cluster-cidr=fd00:10:20::/72,10.20.0.0/16
+```
+
+### vendor/github.com/spf13/pflag
+IPNetSlice will be added to spf13.pflag to allow parsing of comma separated CIDRs.
+
+[https://github.com/spf13/pflag/pull/170](https://github.com/spf13/pflag/pull/170)
 
 ### End-to-End Test Support
 \<TBD\>
