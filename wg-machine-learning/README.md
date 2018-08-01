@@ -18,6 +18,8 @@ Identify and fix gaps in Kubernetes to better support Machine Learning applicati
 
 * Vishnu Kannan (**[@vishh](https://github.com/vishh)**), Google
 * Kenneth Owens (**[@kow3ns](https://github.com/kow3ns)**), Google
+* Balaji Subramaniam (**[@balajismaniam](https://github.com/balajismaniam)**), Intel
+* Connor Doyle (**[@ConnorDoyle](https://github.com/ConnorDoyle)**), Intel
 
 ## Contact
 * [Slack](https://kubernetes.slack.com/messages/wg-machine-learning)
@@ -28,7 +30,7 @@ A working group dedicated towards making Kubernetes work best for Machine Learni
 
 The charter for this working group as [proposed](https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/kubernetes-dev/lOeMjOLilxI/wuQayFDvCQAJ) is as follows:
 
-    * Asses the state of the art for ML workloads on K8s
+    * Assess the state of the art for ML workloads on K8s
     * Identify pain points users currently have with ML on k8s
     * Identify, prioritize and execute on improving k8s to better support ML workloads in the near, medium, and long term.
 
