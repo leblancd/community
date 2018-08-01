@@ -335,10 +335,28 @@ The [NGINX ingress controller](https://github.com/kubernetes/ingress-nginx/blob/
 \<TBD\>
 
 ### Cloud Provider Plugins Considerations
-\<TBD\>
+
+The [Cloud Providers](https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/)
+
+##### Multiple bind addresses configuration
+The existing "--bind-address" option for the will be modified to support multiple IP addresses in a comma-separated list (rather than a single IP string).
+```
+  --bind-address  stringSlice   (IP addresses, in a comma separated list, Default: [0.0.0.0,])
+```
+Only the first address of each IP family will be used; all others will be ignored.
+
+##### Multiple cluster CIDRs configuration
+The existing "--cluster-cidr" option for the [cloud-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/cloud-controller-manager/) will be modified to support multiple IP CIDRs in a comma-separated list (rather than a single IP CIDR).
+```
+  --cluster-cidr  ipNetSlice   (IP CIDRs, in a comma separated list, Default: [])
+```
+Only the first CIDR for each IP family will be used; all others will be ignored.
+
+The cloud_cidr_allocator will be upddated to support allocating from multiple CIDRs
+The route_controller will be updated create routes for multplie CIDRs.
+
 
 ### Container Environment Variables
--\<TBD\>
 The [container environmental variables](https://kubernetes.io/docs/concepts/containers/container-environment-variables/#container-environment) should support dual stack.
 
 The Downward API [status.podIP](https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/#capabilities-of-the-downward-api) will preserve the existing single IP address, and will be set to the default IP for each pod. A new environmental variable named status.podIPs will contain a comma-separated list of IP addresses. The new pod API will have a slice of structures for the additional IP addresses. Kubelet will translate the pod structures and return podIPs as a comma-delimited string.
