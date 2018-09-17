@@ -58,6 +58,9 @@ Table of Contents
          * [GCE Ingress Controller: Out-of-Scope, Testing Deferred For Now](#gce-ingress-controller-out-of-scope-testing-deferred-for-now)
          * [NGINX Ingress Controller - Dual-Stack Support for Bare Metal Clusters](#nginx-ingress-controller---dual-stack-support-for-bare-metal-clusters)
       * [Load Balancer Operation](#load-balancer-operation)
+         * [ClusterIP](#type-clusterip)
+         * [NodePort](#type-nodeport)
+         * [Cloud Provider Load Balancer](#type-load-balancer)
       * [Cloud Provider Plugins Considerations](#cloud-provider-plugins-considerations)
       * [Container Environment Variables](#container-environment-variables)
       * [Kubeadm Support](#kubeadm-support)
@@ -255,6 +258,8 @@ This per-service-port IP family configuration is required because:
 If a port definition for a service is configured with an ipFamily of "ipv4" ("ipv6"), then endpoints for that port for the service will not include any IPv6 (IPv4) addresses that have been allocated to backend pods for the service.
 
 If a port definition is configured with an ipFamily of "dual-stack", then both IPv4 and IPv6 endpoints will be created, but the service will only have a single service IP allocated (dependent on the cluster's configured service CIDR).
+If the port is defined as a nodePort and ipFamily is dual-stack, then the iptables will be configured for both
+families, allowing both IPv4 and IPv6 forwarding.
 
 ### Endpoints
 
@@ -425,14 +430,59 @@ The [NGINX ingress controller](https://github.com/kubernetes/ingress-nginx/blob/
 - Ingress access can cross IP families. For example, an incoming L7 request that is received via IPv4 can be load balanced to an IPv6 endpoint address in the cluster, and vice versa. 
 
 ### Load Balancer Operation
-\<TBD\>
+
+As noted above,
+External load balancers that rely on Kubernetes services for load balancing functionality will only work with the IP family that matches the IP family of the cluster's service CIDR.
+#### Type ClusterIP
+
+The ClusterIP service type will be single stack, so for this case there
+will be no changes to the current load balancer config. The user has the option
+to create two load balancer IP resources, one for IPv6 and the other for IPv4,
+and associate both with the same application instances.
+
+#### Type NodePort
+
+The NodePort service type uses the nodes IP address, which can be dual stack, and port.
+If the service type is NodePort and the ipFamily is DualStack [NodePort](#configuration-of-ip-family-in-service-definitions)
+the load balancer can be configured as dual stack, as both families will get forwarded.
+
+#### Type Load Balancer
+
+The cloud provider will provision an external load balancer.
+If the cloud provider load balancer maps directly to the pod iP's
+then a dual stack load balancer could be used. Additional information may need to
+be provided to the cloud provider to configure dual stack.
 
 ### Cloud Provider Plugins Considerations
-\<TBD\>
+
+The [Cloud Providers](https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/)
+may have individual requirements for dual stack in addition to below.
+
+##### Multiple bind addresses configuration
+The existing "--bind-address" option for the will be modified to support multiple IP addresses in a comma-separated list (rather than a single IP string).
+```
+  --bind-address  stringSlice   (IP addresses, in a comma separated list, Default: [0.0.0.0,])
+```
+Only the first address of each IP family will be used; all others will be ignored.
+
+##### Multiple cluster CIDRs configuration
+The existing "--cluster-cidr" option for the [cloud-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/cloud-controller-manager/) will be modified to support multiple IP CIDRs in a comma-separated list (rather than a single IP CIDR).
+```
+  --cluster-cidr  ipNetSlice   (IP CIDRs, in a comma separated list, Default: [])
+```
+Only the first CIDR for each IP family will be used; all others will be ignored.
+
+The cloud_cidr_allocator will be updated to support allocating from multiple CIDRs.
+The route_controller will be updated to create routes for multiple CIDRs.
+
 
 ### Container Environment Variables
--\<TBD\>
+
 The [container environmental variables](https://kubernetes.io/docs/concepts/containers/container-environment-variables/#container-environment) should support dual stack.
+
+Pod information is exposed through environmental variables on the pod. There are a few environmental
+variables that are automatically created, and some need to be specified in the pod definition, through the
+downward api.
 
 The Downward API [status.podIP](https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/#capabilities-of-the-downward-api) will preserve the existing single IP address, and will be set to the default IP for each pod. A new environmental variable named status.podIPs will contain a comma-separated list of IP addresses. The new pod API will have a slice of structures for the additional IP addresses. Kubelet will translate the pod structures and return podIPs as a comma-delimited string.
 
@@ -487,7 +537,30 @@ Kubeadm will also need to generate dual-stack CIDRs for the --cluster-cidr argum
 This dual-stack proposal will introduce a new IPNetSlice object to spf13.pflag to allow parsing of comma separated CIDRs. Refer to [https://github.com/spf13/pflag/pull/170](https://github.com/spf13/pflag/pull/170)
 
 ### End-to-End Test Support
-\<TBD\>
+
+End-to-End tests will be updated for Dual-Stack.
+The E2E tests will use deployment scripts from the kubernetes-sigs/kubeadm-dind-cluster
+github repo to set up a containerized (Docker-in-Docker), multi-node Kubernetes
+cluster that is running in a Prow container, similar to the IPv6 single stack E2E tests.
+The Docker-in-Docker cluster will be updated to support dual-stack.
+
+The below Network Connectivity tests cases can be run in a new dual stack mode.
+New tests will be created based on the single stack tests, and will test both IPv4 and IPv6 communication.
+A new Dual-Stack test flag will be created to control when the dual stack tests are run.
+
+```
+[It] should function for node-pod communication: udp [Conformance]
+[It] should function for node-pod communication: http [Conformance]
+[It] should function for intra-pod communication: http [Conformance]
+[It] should function for intra-pod communication: udp [Conformance]
+```
+Most service test cases do not need to be updated as the service remains single stack.
+For the test that checks pod internet connectivity, the IPv4 and IPv6 tests can be run individually,
+with the same initial configurations.
+
+```
+[It] should provide Internet connection for containers
+```
 
 ### User Stories
 \<TBD\>
